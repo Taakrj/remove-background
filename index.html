@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Background Remover</title>
+    <style>
+        /* Basic Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        #upload {
+            display: none;
+        }
+        .custom-upload {
+            display: inline-block;
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        .preview {
+            margin-top: 20px;
+            display: none;
+        }
+        .preview img {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .buttons {
+            margin-top: 20px;
+        }
+        .buttons button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 1em;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            background-color: #007bff;
+            color: #fff;
+            transition: background-color 0.3s;
+        }
+        .buttons button:hover {
+            background-color: #0056b3;
+        }
+        .buttons button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .loading {
+            margin-top: 20px;
+            color: #555;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Automatic Background Remover</h2>
+        <label class="custom-upload" for="upload">Upload Image</label>
+        <input type="file" id="upload" accept="image/*">
+        <div class="loading" id="loadingMessage">Processing image, please wait...</div>
+        <div class="preview" id="previewContainer">
+            <img id="resultImage" alt="Processed Image">
+            <div class="buttons">
+                <button id="downloadButton" onclick="downloadImage()">Download Image</button>
+                <button onclick="clearImage()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let apiKey = 'mnCSmS7a2Lpc5hfNbrYRLN6S'; // Replace with your remove.bg API key
+        let resultImage = document.getElementById('resultImage');
+        let previewContainer = document.getElementById('previewContainer');
+        let loadingMessage = document.getElementById('loadingMessage');
+        let uploadedImage;
+
+        // Convert base64 to Blob for the API request
+        function dataURLtoBlob(dataURL) {
+            const byteString = atob(dataURL.split(',')[1]);
+            const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: mimeString });
+        }
+
+        // Handle image upload and automatic processing
+        document.getElementById('upload').addEventListener('change', function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    uploadedImage = e.target.result;
+                    previewContainer.style.display = 'none'; // Hide preview initially
+                    removeBackground(uploadedImage); // Automatically start background removal
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Function to remove the background
+        function removeBackground(imageData) {
+            loadingMessage.style.display = 'block'; // Show loading message
+            const formData = new FormData();
+            formData.append('image_file', dataURLtoBlob(imageData), 'image.png');
+            formData.append('size', 'auto');
+
+            fetch('https://api.remove.bg/v1.0/removebg', {
+                method: 'POST',
+                headers: {
+                    'X-Api-Key': apiKey
+                },
+                body: formData
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                loadingMessage.style.display = 'none'; // Hide loading message
+                if (blob.type.startsWith('image/')) {
+                    const url = URL.createObjectURL(blob);
+                    resultImage.src = url;
+                    previewContainer.style.display = 'block'; // Show preview container
+                } else {
+                    alert('Failed to remove background. Please try again.');
+                }
+            })
+            .catch(error => {
+                loadingMessage.style.display = 'none'; // Hide loading message
+                console.error('Error:', error);
+                alert('Error occurred while processing the image. Please try again.');
+            });
+        }
+
+        // Function to download the image
+        function downloadImage() {
+            if (!resultImage.src) {
+                alert('No image to download.');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.href = resultImage.src;
+            link.download = 'background_removed.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Function to clear the image
+        function clearImage() {
+            uploadedImage = null;
+            resultImage.src = '';
+            previewContainer.style.display = 'none';
+            document.getElementById('upload').value = ''; // Reset file input
+        }
+    </script>
+</body>
+</html>
